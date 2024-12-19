@@ -1,0 +1,168 @@
+---
+title: "Untitled"
+author: "John McElderry"
+date: "2024-10-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#importing libraries
+library(data.table)
+library(dplyr)
+library(stringr)
+library(tm)
+```
+
+```{r}
+#reading in the data sets we are going to be useing
+survey_data <- read.csv("survey.csv")
+purchase_data <- read.csv("amazon-purchases.csv")
+
+#full joining the data sets for easier use
+complete_data <- survey_data %>% full_join(purchase_data, by = "Survey.ResponseID")
+
+#removing punctuation from columns to avoid later errors when working with the columns
+colnames(complete_data)<-removePunctuation(colnames(complete_data))
+```
+
+```{r}
+#creating a new variable to avoid overwriting anything done to this point
+new_decision <- complete_data
+
+#these are the columns deemed as exercise related from the data set that we are going to analyze
+match <- c("HAND_STRENGTHENER", "MUSCLE_ROLLER", "EXERCISE_MAT", "WEIGHT_RACK", "WEIGHTLIFTING_BELT", "EXERCISE_BAND", "EXERCISE_STRAP", "EXERCISE_BLOCK", "STRENGTH_TRAINING_MACHINE", "ABDOMINAL_EXERCISER", "WEARABLE_WEIGHT", "FITNESS_BENCH", "EXERCISE_MACHINE", "FITNESS_STEPPER", "FITNESS_HOOP", "EXERCISE_STEP_PLATFORM", "WEIGHT_PLATE","FITNESS_EQUIPMENT")
+
+#renaming all categories related to exercise as EXERCISE for easier manipulation and comparisons later
+new_decision$Category <- gsub(paste(match, collapse = "|"), "EXCERCISE", new_decision$Category)
+
+#Creating a new column to show the amount of money goes toward exercise in each purchase. If it is not exercise the value is zero otherwise it is quantity times the price for exercise related purchases
+new_decision <- new_decision %>% mutate(EXCERCISE_SPENT = ifelse(Category == "EXCERCISE", PurchasePricePerUnit * Quantity, 0)) %>% group_by(SurveyResponseID) %>% mutate(TOTAL_EXCERCISE_SPENT = sum(EXCERCISE_SPENT))
+
+#A different method of what was done above in order to compare averages of all purchases related to Exercise and the averages of Exercise spent with people who have only ever bought exercise related items.
+EXCERCISE_related_decision <- complete_data %>% filter(grepl(paste(match, collapse = "|"), Category))
+
+#renaming all categories related to exercise as EXERCISE for easier manipulation and comparisons later
+EXCERCISE_related_decision$Category <- 'EXCERCISE'
+
+#Creating a new column to show the amount of money goes toward exercise in each purchase.
+EXCERCISE_related_decision <- EXCERCISE_related_decision %>% mutate(EXCERCISE_SPENT = PurchasePricePerUnit * Quantity) %>% group_by(SurveyResponseID) %>% mutate(TOTAL_EXCERCISE_SPENT = sum(EXCERCISE_SPENT))
+
+#finding the average money spent on exercise
+average_spent_total <- new_decision %>% select(c(SurveyResponseID, TOTAL_EXCERCISE_SPENT)) %>% group_by(SurveyResponseID) %>% summarise(TOTAL_EXCERCISE_SPENT = mean(TOTAL_EXCERCISE_SPENT)) %>% arrange(desc(TOTAL_EXCERCISE_SPENT))
+
+#finding the average amount of money people have spent on exercise between people who have only every bought something exercise related only
+average_spent_EXCERCISE <- EXCERCISE_related_decision %>% select(c(SurveyResponseID, TOTAL_EXCERCISE_SPENT)) %>% group_by(SurveyResponseID) %>% summarise(TOTAL_EXCERCISE_SPENT = mean(TOTAL_EXCERCISE_SPENT)) %>% arrange(desc(TOTAL_EXCERCISE_SPENT))
+
+#averages
+average_spent_total <- mean(average_spent_total[["TOTAL_EXCERCISE_SPENT"]])
+average_spent_EXCERCISE <- mean(average_spent_EXCERCISE[["TOTAL_EXCERCISE_SPENT"]])
+
+average_spent_total
+average_spent_EXCERCISE
+```
+```{r}
+#Creating a binary 1 or 0 for if a person has bought more than the average spent on exercise
+new_decision_tree <- new_decision %>% group_by(SurveyResponseID) %>% mutate(MORE_THAN_AVERAGE = ifelse(TOTAL_EXCERCISE_SPENT > average_spent_total, 1, 0))
+```
+
+
+```{r}
+#These blocks of code are taking a category from the data set and assigning a 1 or 0 to each person based on if they have every bought something within that category before or not.
+category_decision_tree <- new_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_MOTHERBOARD= sum(Category == "MOTHERBOARD")) %>% arrange(desc(HAS_PURCHASED_MOTHERBOARD)) %>% mutate(HAS_PURCHASED_MOTHERBOARD = ifelse(HAS_PURCHASED_MOTHERBOARD > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_GOLF_BAG = sum(Category == "GOLF_CLUB_BAG")) %>% arrange(desc(HAS_PURCHASED_GOLF_BAG)) %>% mutate(HAS_PURCHASED_GOLF_BAG = ifelse(HAS_PURCHASED_GOLF_BAG > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_TOYS_AND_GAMES= sum(Category == "TOYS_AND_GAMES")) %>% arrange(desc(HAS_PURCHASED_TOYS_AND_GAMES)) %>% mutate(HAS_PURCHASED_TOYS_AND_GAMES = ifelse(HAS_PURCHASED_TOYS_AND_GAMES > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_SUGAR_CANDY= sum(Category == "SUGAR_CANDY")) %>% arrange(desc(HAS_PURCHASED_SUGAR_CANDY)) %>% mutate(HAS_PURCHASED_SUGAR_CANDY = ifelse(HAS_PURCHASED_SUGAR_CANDY > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_SKATEBOARD= sum(Category == "SKATEBOARD")) %>% arrange(desc(HAS_PURCHASED_SKATEBOARD)) %>% mutate(HAS_PURCHASED_SKATEBOARD = ifelse(HAS_PURCHASED_SKATEBOARD > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_GAMES= sum(Category == "GAMES")) %>% arrange(desc(HAS_PURCHASED_GAMES)) %>% mutate(HAS_PURCHASED_GAMES = ifelse(HAS_PURCHASED_GAMES > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_AMAZON_BOOK_READER= sum(Category == "AMAZON_BOOK_READER")) %>% arrange(desc(HAS_PURCHASED_AMAZON_BOOK_READER)) %>% mutate(HAS_PURCHASED_AMAZON_BOOK_READER = ifelse(HAS_PURCHASED_AMAZON_BOOK_READER > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_WEARABLE_COMPUTER= sum(Category == "WEARABLE_COMPUTER")) %>% arrange(desc(HAS_PURCHASED_WEARABLE_COMPUTER)) %>% mutate(HAS_PURCHASED_WEARABLE_COMPUTER = ifelse(HAS_PURCHASED_WEARABLE_COMPUTER > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_PET_SUPPLIES= sum(Category == "PET_SUPPLIES")) %>% arrange(desc(HAS_PURCHASED_PET_SUPPLIES)) %>% mutate(HAS_PURCHASED_PET_SUPPLIES = ifelse(HAS_PURCHASED_PET_SUPPLIES > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_SPORTING_GOODS= sum(Category == "SPORTING_GOODS")) %>% arrange(desc(HAS_PURCHASED_SPORTING_GOODS)) %>% mutate(HAS_PURCHASED_SPORTING_GOODS = ifelse(HAS_PURCHASED_SPORTING_GOODS > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_ABIS_BOOK= sum(Category == "ABIS_BOOK")) %>% arrange(desc(HAS_PURCHASED_ABIS_BOOK)) %>% mutate(HAS_PURCHASED_ABIS_BOOK = ifelse(HAS_PURCHASED_ABIS_BOOK > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_HEADPHONES= sum(Category == "HEADPHONES")) %>% arrange(desc(HAS_PURCHASED_HEADPHONES)) %>% mutate(HAS_PURCHASED_HEADPHONES = ifelse(HAS_PURCHASED_HEADPHONES > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_PHYSICAL_VIDEO_GAME_SOFTWARE= sum(Category == "PHYSICAL_VIDEO_GAME_SOFTWARE")) %>% arrange(desc(HAS_PURCHASED_PHYSICAL_VIDEO_GAME_SOFTWARE)) %>% mutate(HAS_PURCHASED_PHYSICAL_VIDEO_GAME_SOFTWARE = ifelse(HAS_PURCHASED_PHYSICAL_VIDEO_GAME_SOFTWARE > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_SNACK_CHIP_AND_CRISP= sum(Category == "SNACK_CHIP_AND_CRISP")) %>% arrange(desc(HAS_PURCHASED_SNACK_CHIP_AND_CRISP)) %>% mutate(HAS_PURCHASED_SNACK_CHIP_AND_CRISP = ifelse(HAS_PURCHASED_SNACK_CHIP_AND_CRISP > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_DOWNLOADABLE_VIDEO_GAME= sum(Category == "DOWNLOADABLE_VIDEO_GAME")) %>% arrange(desc(HAS_PURCHASED_DOWNLOADABLE_VIDEO_GAME)) %>% mutate(HAS_PURCHASED_DOWNLOADABLE_VIDEO_GAME = ifelse(HAS_PURCHASED_DOWNLOADABLE_VIDEO_GAME > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_OUTDOOR_LIVING= sum(Category == "OUTDOOR_LIVING")) %>% arrange(desc(HAS_PURCHASED_OUTDOOR_LIVING)) %>% mutate(HAS_PURCHASED_OUTDOOR_LIVING = ifelse(HAS_PURCHASED_OUTDOOR_LIVING > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_COOKIE= sum(Category == "COOKIE")) %>% arrange(desc(HAS_PURCHASED_COOKIE)) %>% mutate(HAS_PURCHASED_COOKIE = ifelse(HAS_PURCHASED_COOKIE > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_MEAT= sum(Category == "MEAT")) %>% arrange(desc(HAS_PURCHASED_MEAT)) %>% mutate(HAS_PURCHASED_MEAT = ifelse(HAS_PURCHASED_MEAT > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_SWIMWEAR= sum(Category == "SWIMWEAR")) %>% arrange(desc(HAS_PURCHASED_SWIMWEAR)) %>% mutate(HAS_PURCHASED_SWIMWEAR = ifelse(HAS_PURCHASED_SWIMWEAR > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_FOOD_STORAGE_CONTAINER= sum(Category == "FOOD_STORAGE_CONTAINER")) %>% arrange(desc(HAS_PURCHASED_FOOD_STORAGE_CONTAINER)) %>% mutate(HAS_PURCHASED_FOOD_STORAGE_CONTAINER = ifelse(HAS_PURCHASED_FOOD_STORAGE_CONTAINER > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_MASSAGER= sum(Category == "MASSAGER")) %>% arrange(desc(HAS_PURCHASED_MASSAGER)) %>% mutate(HAS_PURCHASED_MASSAGER = ifelse(HAS_PURCHASED_MASSAGER > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_WEIGH_SCALE= sum(Category == "WEIGH_SCALE")) %>% arrange(desc(HAS_PURCHASED_WEIGH_SCALE)) %>% mutate(HAS_PURCHASED_WEIGH_SCALE = ifelse(HAS_PURCHASED_WEIGH_SCALE > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_SPEAKERS= sum(Category == "SPEAKERS")) %>% arrange(desc(HAS_PURCHASED_SPEAKERS)) %>% mutate(HAS_PURCHASED_SPEAKERS = ifelse(HAS_PURCHASED_SPEAKERS > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_PLANNER= sum(Category == "PLANNER")) %>% arrange(desc(HAS_PURCHASED_PLANNER)) %>% mutate(HAS_PURCHASED_PLANNER = ifelse(HAS_PURCHASED_PLANNER > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_INSTRUMENT_PARTS_AND_ACCESSORIES= sum(Category == "INSTRUMENT_PARTS_AND_ACCESSORIES")) %>% arrange(desc(HAS_PURCHASED_INSTRUMENT_PARTS_AND_ACCESSORIES)) %>% mutate(HAS_PURCHASED_INSTRUMENT_PARTS_AND_ACCESSORIES = ifelse(HAS_PURCHASED_INSTRUMENT_PARTS_AND_ACCESSORIES > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_MEDICATION= sum(Category == "MEDICATION")) %>% arrange(desc(HAS_PURCHASED_MEDICATION)) %>% mutate(HAS_PURCHASED_MEDICATION = ifelse(HAS_PURCHASED_MEDICATION > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_VEGETABLE= sum(Category == "VEGETABLE")) %>% arrange(desc(HAS_PURCHASED_VEGETABLE)) %>% mutate(HAS_PURCHASED_VEGETABLE = ifelse(HAS_PURCHASED_VEGETABLE > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_VITAMIN = sum(Category == "VITAMIN")) %>% arrange(desc(HAS_PURCHASED_VITAMIN)) %>% mutate(HAS_PURCHASED_VITAMIN = ifelse(HAS_PURCHASED_VITAMIN > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_PET_FOOD = sum(Category == "PET_FOOD")) %>% arrange(desc(HAS_PURCHASED_PET_FOOD)) %>% mutate(HAS_PURCHASED_PET_FOOD = ifelse(HAS_PURCHASED_PET_FOOD > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_SKIN_MOISTURIZER = sum(Category == "SKIN_MOISTURIZER")) %>% arrange(desc(HAS_PURCHASED_SKIN_MOISTURIZER)) %>% mutate(HAS_PURCHASED_SKIN_MOISTURIZER = ifelse(HAS_PURCHASED_SKIN_MOISTURIZER > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_COFFEE = sum(Category == "COFFEE")) %>% arrange(desc(HAS_PURCHASED_COFFEE)) %>% mutate(HAS_PURCHASED_COFFEE = ifelse(HAS_PURCHASED_COFFEE > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_PHYSICAL_MOVIE = sum(Category == "PHYSICAL_MOVIE")) %>% arrange(desc(HAS_PURCHASED_PHYSICAL_MOVIE)) %>% mutate(HAS_PURCHASED_PHYSICAL_MOVIE = ifelse(HAS_PURCHASED_PHYSICAL_MOVIE > 0, 1, 0))
+
+
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_NUTRITIONAL_SUPPLEMENT = sum(Category == "NUTRITIONAL_SUPPLEMENT")) %>% arrange(desc(HAS_PURCHASED_NUTRITIONAL_SUPPLEMENT)) %>% mutate(HAS_PURCHASED_NUTRITIONAL_SUPPLEMENT = ifelse(HAS_PURCHASED_NUTRITIONAL_SUPPLEMENT > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_SKIN_CLEANING_AGENT = sum(Category == "SKIN_CLEANING_AGENT")) %>% arrange(desc(HAS_PURCHASED_SKIN_CLEANING_AGENT)) %>% mutate(HAS_PURCHASED_SKIN_CLEANING_AGENT = ifelse(HAS_PURCHASED_SKIN_CLEANING_AGENT > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_HERBAL_SUPPLEMENT = sum(Category == "HERBAL_SUPPLEMENT")) %>% arrange(desc(HAS_PURCHASED_HERBAL_SUPPLEMENT)) %>% mutate(HAS_PURCHASED_HERBAL_SUPPLEMENT = ifelse(HAS_PURCHASED_HERBAL_SUPPLEMENT > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_MINERAL_SUPPLEMENT = sum(Category == "MINERAL_SUPPLEMENT")) %>% arrange(desc(HAS_PURCHASED_MINERAL_SUPPLEMENT)) %>% mutate(HAS_PURCHASED_MINERAL_SUPPLEMENT = ifelse(HAS_PURCHASED_MINERAL_SUPPLEMENT > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_PROTEIN_DRINK = sum(Category == "PROTEIN_DRINK")) %>% arrange(desc(HAS_PURCHASED_PROTEIN_DRINK)) %>% mutate(HAS_PURCHASED_PROTEIN_DRINK = ifelse(HAS_PURCHASED_PROTEIN_DRINK > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_PROTEIN_SUPPLEMENT_POWDER = sum(Category == "PROTEIN_SUPPLEMENT_POWDER")) %>% arrange(desc(HAS_PURCHASED_PROTEIN_SUPPLEMENT_POWDER)) %>% mutate(HAS_PURCHASED_PROTEIN_SUPPLEMENT_POWDER = ifelse(HAS_PURCHASED_PROTEIN_SUPPLEMENT_POWDER > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_DIETARY_SUPPLEMENTS = sum(Category == "DIETARY_SUPPLEMENTS")) %>% arrange(desc(HAS_PURCHASED_DIETARY_SUPPLEMENTS)) %>% mutate(HAS_PURCHASED_DIETARY_SUPPLEMENTS = ifelse(HAS_PURCHASED_DIETARY_SUPPLEMENTS > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_ABIS_SPORTS = sum(Category == "ABIS_SPORTS")) %>% arrange(desc(HAS_PURCHASED_ABIS_SPORTS)) %>% mutate(HAS_PURCHASED_ABIS_SPORTS = ifelse(HAS_PURCHASED_ABIS_SPORTS > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_HEALTH_FOOD = sum(Category == "HEALTH_FOOD")) %>% arrange(desc(HAS_PURCHASED_HEALTH_FOOD)) %>% mutate(HAS_PURCHASED_HEALTH_FOOD = ifelse(HAS_PURCHASED_HEALTH_FOOD > 0, 1, 0))
+
+category_decision_tree <- category_decision_tree %>% group_by(SurveyResponseID) %>% mutate(HAS_PURCHASED_SPORTS_DRINK = sum(Category == "SPORTS_DRINK")) %>% arrange(desc(HAS_PURCHASED_SPORTS_DRINK)) %>% mutate(HAS_PURCHASED_SPORTS_DRINK = ifelse(HAS_PURCHASED_SPORTS_DRINK > 0, 1, 0))
+
+#Making sure there is only one instance of each person in the survey as we no longer need row wise information about what people have purchased since we have already reformatted this into a column binary output.
+category_decision_tree <- category_decision_tree[!duplicated(category_decision_tree[,'SurveyResponseID']),]
+
+#removing columns we will not need anymore
+category_decision_tree <- category_decision_tree %>% select(-c("Title", "ASINISBNProductCode", "Category", "Quantity", "PurchasePricePerUnit", "OrderDate", "EXCERCISE_SPENT"))
+```
+
+```{r}
+#output the cleaned and reformed data set for use in other programs
+write.csv(category_decision_tree, "category_decision_tree.csv")
+```
